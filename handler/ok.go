@@ -9,7 +9,7 @@ import (
 	"net/http"
 )
 
-// OK replies to the request with the "200", and "OK".
+// OK replies with `200` status code, and "OK" in the body.
 func OK() Handler {
 	return Handler{
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

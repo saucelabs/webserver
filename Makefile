@@ -32,4 +32,4 @@ endif
 
 ci: lint test coverage
 
-.PHONY: lint test test-integration coverage doc ci
+.PHONY: lint test coverage doc ci

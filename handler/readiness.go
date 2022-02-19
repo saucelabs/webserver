@@ -5,6 +5,7 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 )
 
@@ -15,8 +16,8 @@ import (
 type ReadinessFunc func() error
 
 // Readiness indicates the server is up, running, and ready to work. It follows
-// the "standard" which is send "200", and "OK" if ready, or "503" and
-// "Service Unavailable" plus the error, if not ready.
+// the "standard" which is send `200` status code, and "OK" in the body if it's
+// ready, otherwise sends `503`, "Service Unavailable", and the error.
 func Readiness(readinessFunc ReadinessFunc) Handler {
 	return Handler{
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -30,7 +31,7 @@ func Readiness(readinessFunc ReadinessFunc) Handler {
 
 			w.WriteHeader(http.StatusOK)
 
-			w.Write([]byte(http.StatusText(http.StatusOK)))
+			fmt.Fprintln(w, http.StatusText(http.StatusOK))
 		}),
 		Method: http.MethodGet,
 		Path:   "/readiness",

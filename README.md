@@ -1,13 +1,16 @@
 # webserver
 
-`webserver` provides a server in which:
+`webserver` provides a web server:
 
 - Gracefully handles shutdown
-- As built-in logger powered Sypl
-- As telemetry powered by Open Telemetry
-- As built-in useful handlers such as liveness, and readiness
-- As metrics powered by ExpVar
-- Applies best practices such as setting up timeouts.
+- Applies best practices such as setting up timeouts
+- Routing powered by Gorilla Mux
+- Logging powered Sypl
+- HTTP server powered by Go built-in HTTP server
+- Observability is first-class:
+  - Telemetry powered by Open Telemetry
+  - Metrics powered by ExpVar
+  - Built-in useful handlers such as liveness, and readiness
 
 ## Install
 

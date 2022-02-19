@@ -5,11 +5,12 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 )
 
 // Liveness indicates the server is up, and running. It follows the "standard"
-// which is send "200", and "OK".
+// which is send `200` status code, and "OK" in the body.
 func Liveness() Handler {
 	return Handler{
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -17,7 +18,7 @@ func Liveness() Handler {
 
 			w.WriteHeader(http.StatusOK)
 
-			w.Write([]byte(http.StatusText(http.StatusOK)))
+			fmt.Fprintln(w, http.StatusText(http.StatusOK))
 		}),
 		Method: http.MethodGet,
 		Path:   "/liveness",

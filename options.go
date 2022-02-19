@@ -18,15 +18,24 @@
 package webserver
 
 import (
-	"expvar"
 	"time"
 
+	"github.com/saucelabs/sypl/level"
 	handler "github.com/saucelabs/webserver/handler"
+	"github.com/saucelabs/webserver/internal/expvar"
 	"github.com/saucelabs/webserver/telemetry"
 )
 
+//////
+// Const, vars, and types.
+//////
+
 // Option allows to define options for the Server.
 type Option func(s *Server)
+
+//////
+// Timeout.
+//////
 
 // WithTimeout sets the maximum duration for each individual timeouts.
 func WithTimeout(read, request, inflight, tasks, write time.Duration) Option {
@@ -39,9 +48,14 @@ func WithTimeout(read, request, inflight, tasks, write time.Duration) Option {
 	}
 }
 
+//////
+// Telemetry.
+//////
+
 // WithTelemetry sets telemetry.
 //
 // NOTE: Use `telemetry.New` to bring your own telemetry.
+//
 // SEE: https://opentelemetry.io/vendors
 func WithTelemetry(t *telemetry.Telemetry) Option {
 	return func(s *Server) {
@@ -56,22 +70,9 @@ func WithoutTelemetry() Option {
 	}
 }
 
-// WithReadiness sets server readiness. Returning any non-nil error means server
-// isn't ready.
-func WithReadiness(readinessFunc handler.ReadinessFunc) Option {
-	return func(s *Server) {
-		s.preLoadedHandlers = append(s.preLoadedHandlers, handler.Readiness(readinessFunc))
-	}
-}
-
-// WithHandlers adds a handler to the pre-loaded handlers.
-//
-// NOTE: Use `handler.New` to add handlers
-func WithHandlers(handlers ...handler.Handler) Option {
-	return func(s *Server) {
-		addHandler(s.GetRouter(), handlers)
-	}
-}
+//////
+// Metrics.
+//////
 
 // WithMetricsRaw allows to publishes metrics based on exp vars. It's useful for
 // cases such as counters. It gives full control over what's being exposed.
@@ -87,5 +88,69 @@ func WithMetrics(name string, v interface{}) Option {
 		expvar.Publish(name, expvar.Func(func() interface{} {
 			return v
 		}))
+	}
+}
+
+// WithoutMetrics disables metrics.
+func WithoutMetrics() Option {
+	return func(s *Server) {
+		s.EnableMetrics = false
+	}
+}
+
+//////
+// Logging.
+//////
+
+// WithLoggingOptions sets logging configuration.
+//
+// NOTE: Set filepath to "" to disabled that.
+func WithLoggingOptions(console, request, filepath string) Option {
+	return func(s *Server) {
+		s.Logging.ConsoleLevel = console
+		s.Logging.RequestLevel = request
+		s.Logging.Filepath = filepath
+	}
+}
+
+// WithoutLogging() disables logging.
+func WithoutLogging() Option {
+	return func(s *Server) {
+		s.Logging.ConsoleLevel = level.None.String()
+		s.Logging.RequestLevel = level.None.String()
+		s.Logging.Filepath = ""
+	}
+}
+
+//////
+// Handlers.
+//////
+
+// WithReadiness sets server readiness. Returning any non-nil error means server
+// isn't ready.
+func WithReadiness(readinessFunc handler.ReadinessFunc) Option {
+	return func(s *Server) {
+		s.preLoadedHandlers = append(s.preLoadedHandlers, handler.Readiness(readinessFunc))
+	}
+}
+
+// WithPreLoadedHandlers adds handlers to the list of pre-loaded handlers.
+//
+// NOTE: Use `handler.New` to bring your own handler.
+func WithPreLoadedHandlers(handlers ...handler.Handler) Option {
+	return func(s *Server) {
+		addHandler(s.GetRouter(), handlers...)
+	}
+}
+
+// WithoutPreLoadedHandlers disable the default pre-loaded handlers:
+// - OK handler (`GET /`)
+// - Liveness handler (`GET /liveness`)
+// - Readiness handler (`GET /readiness`)
+// - Stop handler (`GET /stop`)
+// - Metrics handler (`GET /debug/vars`).
+func WithoutPreLoadedHandlers() Option {
+	return func(s *Server) {
+		s.preLoadedHandlers = []handler.Handler{}
 	}
 }

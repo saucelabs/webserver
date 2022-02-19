@@ -15,12 +15,14 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/saucelabs/customerror"
 	"github.com/saucelabs/sypl"
+	"github.com/saucelabs/sypl/level"
+	handler "github.com/saucelabs/webserver/handler"
+	"github.com/saucelabs/webserver/internal/expvar"
 	"github.com/saucelabs/webserver/internal/logger"
+	"github.com/saucelabs/webserver/internal/middleware"
 	"github.com/saucelabs/webserver/internal/validation"
 	"github.com/saucelabs/webserver/telemetry"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
-
-	handler "github.com/saucelabs/webserver/handler"
 )
 
 //////
@@ -31,6 +33,12 @@ const (
 	defaultTimeout             = 3 * time.Second
 	defaultRequestTimeout      = 1 * time.Second
 	defaultShutdownTaskTimeout = 10 * time.Second
+	frameworkName              = "webserver"
+)
+
+var ErrRequesTimeout = customerror.NewFailedToError(
+	"finish request, timed out",
+	customerror.WithStatusCode(http.StatusRequestTimeout),
 )
 
 //////
@@ -39,10 +47,10 @@ const (
 
 // IServer defines what a server does.
 type IServer interface {
-	// GetLogger retuns the server logger.
+	// GetLogger returns the server logger.
 	GetLogger() sypl.ISypl
 
-	// GetRouter retuns the server router.
+	// GetRouter returns the server router.
 	GetRouter() *mux.Router
 
 	// Start the server.
@@ -52,6 +60,18 @@ type IServer interface {
 //////
 // Definitions.
 //////
+
+// Logging definition.
+type Logging struct {
+	// ConsoleLevel defines the level for the `Console` output.
+	ConsoleLevel string `json:"console_level" validate:"required,gte=3,oneof=none fatal error info warn debug trace"`
+
+	// RequestLevel defines the level for logging requests.
+	RequestLevel string `json:"request_level" validate:"required,gte=3,oneof=none fatal error info warn debug trace"`
+
+	// Filepath is the file path to optionally write logs.
+	Filepath string `json:"filepath" validate:"omitempty,gte=3"`
+}
 
 // Timeout definition.
 type Timeout struct {
@@ -86,8 +106,15 @@ type Server struct {
 	// Name of the server.
 	Name string `json:"name" validate:"required,gte=3"`
 
-	// Controls whether telemetry are enable, or not, default: true.
+	// EnableMetrics controls whether metrics are enable, or not, default: true.
+	EnableMetrics bool `json:"enable_metrics"`
+
+	// EnableTelemetry controls whether telemetry are enable, or not,
+	// default: true.
 	EnableTelemetry bool `json:"enable_telemetry"`
+
+	// Logging fine-control.
+	*Logging `json:"logging" validate:"required"`
 
 	// Timeouts fine-control.
 	*Timeout `json:"timeout" validate:"required"`
@@ -101,7 +128,7 @@ type Server struct {
 	// Router powered by Gorilla Mux.
 	router *mux.Router `json:"-" validate:"required"`
 
-	// Golang's http server.
+	// HTTP server powered by Golang's built-in http server.
 	server http.Server `json:"-" validate:"required"`
 
 	// Telemetry powered by OpenTelemetry.
@@ -112,17 +139,17 @@ type Server struct {
 // IServer implementation.
 //////
 
-// GetLogger retuns the server logger.
+// GetLogger returns the server logger.
 func (s *Server) GetLogger() sypl.ISypl {
 	return s.logger
 }
 
-// GetRouter retuns the server router.
+// GetRouter returns the server router.
 func (s *Server) GetRouter() *mux.Router {
 	return s.router
 }
 
-// GetTelemetry retuns telemetry.
+// GetTelemetry returns telemetry.
 func (s *Server) GetTelemetry() telemetry.ITelemetry {
 	return s.telemetry
 }
@@ -135,13 +162,10 @@ func (s *Server) Start() error {
 		Handler: http.TimeoutHandler(
 			s.GetRouter(),
 			s.Timeout.RequestTimeout,
-			customerror.NewFailedToError(
-				"finish request, timed out",
-				customerror.WithStatusCode(http.StatusRequestTimeout),
-			).Error(),
+			ErrRequesTimeout.Error(),
 		),
 
-		// Best practice setting timeouts. It avoid "Slowloris" attacks.
+		// Best practice setting timeouts. It avoid "slowloris" attacks.
 		ReadTimeout:  s.Timeout.ReadTimeout,
 		WriteTimeout: s.Timeout.WriteTimeout,
 	}
@@ -168,7 +192,7 @@ func (s *Server) Start() error {
 		const crtlCmsg = "press ctrl+c to stop anyway"
 
 		s.logger.PrintNewLine()
-		s.GetLogger().Tracelnf("Got %s signal, gracefuly shutting down", sig)
+		s.GetLogger().Tracelnf("Got %s signal, gracefully shutting down", sig)
 		s.GetLogger().Tracelnf("Waiting %s for inflight requests to finish, %s", s.ShutdownInFlightTimeout, crtlCmsg)
 
 		// Let Go terminate the program if we get that signal again.
@@ -204,30 +228,41 @@ func (s *Server) Start() error {
 
 		if shutdownErr != nil {
 			return shutdownErr
-		} else {
-			// Wait for tasks such as flush cache and files, and telemetry.
-			s.GetLogger().Tracelnf("Waiting %s for tasks, %s", s.ShutdownTaskTimeout, crtlCmsg)
-
-			time.Sleep(s.ShutdownTaskTimeout)
 		}
+
+		// Wait for tasks such as flush cache and files, and telemetry.
+		s.GetLogger().Tracelnf("Waiting %s for tasks, %s", s.ShutdownTaskTimeout, crtlCmsg)
+
+		time.Sleep(s.ShutdownTaskTimeout)
 
 		// If reaches here, error can be safely collected.
 		return <-serverErr
 	}
 }
 
-// New is the web server factory.
+//////
+// Factory.
+//////
+
+// New is the web server factory. It returns a web server with observability:
+// - Metrics: `cmdline`, `memstats`, and `server`.
+// - Telemetry: `stdout` exporter.
+// - Logging: `error`, no file.
+// - Pre-loaded handlers (Liveness, OK, and Stop).
 func New(
 	name, address string,
 	opts ...Option,
 ) (IServer, error) {
 	s := &Server{
-		Address:           address,
-		EnableTelemetry:   true,
-		logger:            logger.Setup("webserver", "trace", "").New(name),
-		Name:              name,
-		preLoadedHandlers: []handler.Handler{handler.OK(), handler.Liveness(), handler.ExpVar(), handler.Stop()},
-		router:            mux.NewRouter(),
+		Address:         address,
+		EnableMetrics:   true,
+		EnableTelemetry: true,
+		Logging: &Logging{
+			ConsoleLevel: level.Error.String(),
+			RequestLevel: level.Error.String(),
+			Filepath:     "",
+		},
+		Name: name,
 		Timeout: &Timeout{
 			ReadTimeout:             defaultTimeout,
 			RequestTimeout:          defaultRequestTimeout,
@@ -235,6 +270,9 @@ func New(
 			ShutdownTaskTimeout:     defaultShutdownTaskTimeout,
 			WriteTimeout:            defaultTimeout,
 		},
+
+		preLoadedHandlers: []handler.Handler{handler.OK(), handler.Liveness(), handler.Stop()},
+		router:            mux.NewRouter(),
 	}
 
 	//////
@@ -244,6 +282,19 @@ func New(
 	for _, opt := range opts {
 		opt(s)
 	}
+
+	//////
+	// Logging.
+	//////
+
+	s.logger = logger.Setup(
+		frameworkName,
+		s.Logging.ConsoleLevel,
+		s.Logging.RequestLevel,
+		s.Logging.Filepath,
+	).New(name)
+
+	s.router.Use(middleware.Logger(s.logger))
 
 	//////
 	// Telemetry.
@@ -274,13 +325,37 @@ func New(
 	// Load handlers.
 	//////
 
-	addHandler(s.GetRouter(), s.preLoadedHandlers)
+	addHandler(s.GetRouter(), s.preLoadedHandlers...)
 
 	//////
 	// Server metrics.
 	//////
 
-	publishServerMetrics(s)
+	if s.EnableMetrics {
+		// Publish Golang's metrics: cmdline, and memstats.
+		expvar.PublishCmdLine()
+		expvar.PublishMemStats()
+
+		// Publish specific server's information.
+		publishServerMetrics(s)
+
+		// Gorilla Mux exp var route registration.
+		addHandler(s.GetRouter(), handler.ExpVar())
+	}
 
 	return s, nil
+}
+
+// NewBasic returns a basic web server without observability:
+// - Metrics
+// - Telemetry
+// - Logging
+// - Pre-loaded handlers (Liveness, Readiness, OK, and Stop).
+func NewBasic(name, address string, opts ...Option) (IServer, error) {
+	return New(name, address,
+		WithoutMetrics(),
+		WithoutTelemetry(),
+		WithoutLogging(),
+		WithoutPreLoadedHandlers(),
+	)
 }

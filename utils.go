@@ -7,15 +7,15 @@ package webserver
 import (
 	"context"
 	"errors"
-	"expvar"
 	"os"
 
 	"github.com/gorilla/mux"
 	handler "github.com/saucelabs/webserver/handler"
+	"github.com/saucelabs/webserver/internal/expvar"
 )
 
 // Adds a `Handler` to a `Router`.
-func addHandler(router *mux.Router, handlers []handler.Handler) {
+func addHandler(router *mux.Router, handlers ...handler.Handler) {
 	for _, handler := range handlers {
 		router.HandleFunc(handler.Path, handler.Handler).Methods(handler.Method)
 	}

@@ -5,8 +5,9 @@
 package handler
 
 import (
-	"expvar"
 	"net/http"
+
+	"github.com/saucelabs/webserver/internal/expvar"
 )
 
 // ExpVar serves metrics.

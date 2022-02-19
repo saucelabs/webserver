@@ -29,8 +29,9 @@ func Get() *sypl.Sypl {
 }
 
 // Setup logger.
-func Setup(name, logLevel, logFilePath string) *sypl.Sypl {
+func Setup(name, logLevel, requestLogLevel, logFilePath string) *sypl.Sypl {
 	logLevelAsLevel := level.MustFromString(logLevel)
+	requesLogLevelAsLevel := level.MustFromString(requestLogLevel)
 
 	l = sypl.NewDefault(
 		name,
@@ -38,7 +39,9 @@ func Setup(name, logLevel, logFilePath string) *sypl.Sypl {
 		processor.ChangeFirstCharCase(processor.Lowercase),
 	)
 
-	// Only enable File output if path is set.
+	l.SetDefaultIoWriterLevel(requesLogLevelAsLevel)
+
+	// Should only enable File output if path is set.
 	if logFilePath != "" {
 		l.AddOutputs(output.File(
 			logFilePath,
@@ -46,7 +49,7 @@ func Setup(name, logLevel, logFilePath string) *sypl.Sypl {
 			processor.ChangeFirstCharCase(processor.Lowercase),
 		))
 
-		// "-" special case makes the File Output behave as Console, also
+		// "-" special case makes the `File` Output behave as `Console`, also
 		// writing to `stdout` causing duplicated messages.
 		if logFilePath == "-" {
 			l.GetOutput("Console").SetStatus(status.Disabled)

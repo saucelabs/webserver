@@ -52,7 +52,7 @@ type ITelemetry interface {
 	// global tracer is returned.
 	GetTracer(name string) trace.Tracer
 
-	// NewTracer creates and returns a tracer.
+	// NewTracer creates a tracer from the current provider.
 	NewTracer(name string) trace.Tracer
 }
 
@@ -81,7 +81,7 @@ type Telemetry struct {
 // ITelemetry implementation.
 //////
 
-// NewTracer creates and returns a tracer.
+// NewTracer creates a tracer from the current provider.
 func (t *Telemetry) NewTracer(name string) trace.Tracer {
 	tracer := t.Provider.Tracer(name)
 

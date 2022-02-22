@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 To be defined.
 
+## [0.0.2] - 2022-02-22
+### Added
+- Added `GetTelemetry` to the `IServer` interface
+- Added more tests.
+
+### Changed
+- Fixed `NewBasic` options processing.
+
 ## [0.0.1] - 2022-02-22
 ### Added
 - First release.

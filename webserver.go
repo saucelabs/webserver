@@ -53,6 +53,8 @@ type IServer interface {
 	// GetRouter returns the server router.
 	GetRouter() *mux.Router
 
+	GetTelemetry() telemetry.ITelemetry
+
 	// Start the server.
 	Start() error
 }
@@ -352,10 +354,13 @@ func New(
 // - Logging
 // - Pre-loaded handlers (Liveness, Readiness, OK, and Stop).
 func NewBasic(name, address string, opts ...Option) (IServer, error) {
-	return New(name, address,
+	// Merge default options with new ones (`opts`).
+	finalOpts := append([]Option{
 		WithoutMetrics(),
 		WithoutTelemetry(),
 		WithoutLogging(),
 		WithoutPreLoadedHandlers(),
-	)
+	}, opts...)
+
+	return New(name, address, finalOpts...)
 }

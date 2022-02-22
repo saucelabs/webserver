@@ -113,7 +113,7 @@ func setupTestServer(t *testing.T) (IServer, int) {
 }
 
 // DRY on calling an endpoint, and checking expectations.
-//nolint:noctx
+//nolint:noctx,unparam
 func callAndExpect(t *testing.T, port int, url string, sc int, expectedBodyContains string) (int, string) {
 	t.Helper()
 
@@ -248,6 +248,72 @@ func TestNew(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			callAndExpect(t, tt.args.port, tt.args.url, tt.args.sc, tt.args.expectedBodyContains)
+		})
+	}
+}
+
+func TestNewBasic(t *testing.T) {
+	// Random port.
+	r, err := randomness.New(3000, 7000, 10, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	port := r.MustGenerate()
+
+	testServer, err := NewBasic(serverName, fmt.Sprintf("0.0.0.0:%d", port),
+		WithPreLoadedHandlers(
+			handler.Liveness(),
+		),
+		WithLoggingOptions("none", "none", ""),
+	)
+	if err != nil {
+		log.Fatalf("Failed to setup %s, %v", serverName, err)
+	}
+
+	if testServer.GetTelemetry() != nil {
+		t.Fatal("Expected no telemetry")
+	}
+
+	// Starts in a non-blocking way.
+	go func() {
+		if err := testServer.Start(); err != nil {
+			if errors.Is(err, http.ErrServerClosed) {
+				testServer.GetLogger().Infoln("server stopped")
+			} else {
+				log.Fatal(err)
+			}
+		}
+	}()
+
+	// Ensures enough time for the server to be up, and ready - just for testing.
+	time.Sleep(3 * time.Second)
+
+	type args struct {
+		port                 int64
+		url                  string
+		sc                   int
+		expectedBodyContains string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    IServer
+		wantErr bool
+	}{
+		{
+			name: "Should work - liveness",
+			args: args{
+				port:                 port,
+				url:                  "/liveness",
+				sc:                   http.StatusOK,
+				expectedBodyContains: http.StatusText(http.StatusOK),
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			callAndExpect(t, int(tt.args.port), tt.args.url, tt.args.sc, tt.args.expectedBodyContains)
 		})
 	}
 }

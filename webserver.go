@@ -36,6 +36,7 @@ const (
 	frameworkName              = "webserver"
 )
 
+// ErrRequesTimeout indicates a request failed to finish, it timed out.
 var ErrRequesTimeout = customerror.NewFailedToError(
 	"finish request, timed out",
 	customerror.WithStatusCode(http.StatusRequestTimeout),

@@ -128,9 +128,9 @@ func WithoutLogging() Option {
 
 // WithReadiness sets server readiness. Returning any non-nil error means server
 // isn't ready.
-func WithReadiness(readinessFunc handler.ReadinessFunc) Option {
+func WithReadiness(readinessState *handler.ReadinessState) Option {
 	return func(s *Server) {
-		s.preLoadedHandlers = append(s.preLoadedHandlers, handler.Readiness(readinessFunc))
+		s.preLoadedHandlers = append(s.preLoadedHandlers, handler.Readiness(readinessState))
 	}
 }
 

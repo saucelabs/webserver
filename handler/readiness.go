@@ -7,22 +7,83 @@ package handler
 import (
 	"fmt"
 	"net/http"
+	"strings"
+	"sync"
 )
 
-// ReadinessFunc determines readiness. If error isn't `nil`, it means server
-// isn't ready.
-//
-// NOTE: Be mindful that a readiness probe performs this every N-{s|ms}.
-type ReadinessFunc func() error
+// ReadinessState definition. It determines if `name` is ready.
+type ReadinessState struct {
+	name  string
+	ready bool
+	m     sync.Mutex
+}
+
+// Set state name.
+func (t *ReadinessState) SetName(name string) {
+	t.m.Lock()
+	defer t.m.Unlock()
+
+	t.name = name
+}
+
+// Get state name.
+func (t *ReadinessState) GetName() string {
+	t.m.Lock()
+	defer t.m.Unlock()
+
+	return t.name
+}
+
+// Set readiness state.
+func (t *ReadinessState) SetReadiness(v bool) {
+	t.m.Lock()
+	defer t.m.Unlock()
+
+	t.ready = v
+}
+
+// Get readiness state.
+func (t *ReadinessState) GetReadiness() bool {
+	t.m.Lock()
+	defer t.m.Unlock()
+
+	return t.ready
+}
+
+// NewReadiness is the Readiness factory.
+func NewReadiness(name string) *ReadinessState {
+	return &ReadinessState{
+		name:  name,
+		ready: false,
+		m:     sync.Mutex{},
+	}
+}
 
 // Readiness indicates the server is up, running, and ready to work. It follows
 // the "standard" which is send `200` status code, and "OK" in the body if it's
-// ready, otherwise sends `503`, "Service Unavailable", and the error.
-func Readiness(readinessFunc ReadinessFunc) Handler {
+// ready, otherwise sends `503`, "Service Unavailable", and the error. Multiple
+// `Readiness` can be passed. In this case, only if ALL are ready, the server
+// will be considered ready.
+func Readiness(readinessStates ...*ReadinessState) Handler {
 	return Handler{
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if err := readinessFunc(); err != nil {
-				http.Error(w, err.Error(), http.StatusServiceUnavailable)
+			readinessStateFinalState := true
+			readinessesNames := []string{}
+
+			for _, readinessState := range readinessStates {
+				// If any state isn't ready, server isn't ready.
+				if !readinessState.GetReadiness() {
+					readinessStateFinalState = false
+					readinessesNames = append(readinessesNames, readinessState.GetName())
+				}
+			}
+
+			if !readinessStateFinalState {
+				http.Error(
+					w,
+					fmt.Sprintf("server isn't ready. %s failed readiness", strings.Join(readinessesNames, ", ")),
+					http.StatusServiceUnavailable,
+				)
 
 				return
 			}

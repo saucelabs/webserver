@@ -16,6 +16,7 @@ import (
 
 	"github.com/saucelabs/randomness"
 	"github.com/saucelabs/webserver"
+	"github.com/saucelabs/webserver/handler"
 )
 
 const serverName = "test-server"
@@ -70,14 +71,10 @@ func ExampleNew() {
 	// Probe results accumulator. Golang's example requires some output to be
 	// tested against. This accumulator will serve it.
 	probeResults := []string{}
+	probeResultsLocker := sync.Mutex{}
 
 	// Part of the readiness simulation.
-	readinessFlag := false
-
-	// Allows to safely modify `probeResults` and `readinessFlag` from
-	// concurrent routines.
-	var readinessFlagLocker sync.Mutex
-	var probeResultsLocker sync.Mutex
+	readinessFlag := handler.NewReadiness("tunnel")
 
 	// Golang's example are like tests, it's a bad practice to have a hardcoded
 	// port because of the possibility of collision. Generate a random port.
@@ -94,17 +91,7 @@ func ExampleNew() {
 		webserver.WithoutTelemetry(),
 
 		// Sets server readiness.
-		webserver.WithReadiness(func() error {
-			readinessFlagLocker.Lock()
-			defer readinessFlagLocker.Unlock()
-
-			if !readinessFlag {
-				// Returning any error means server isn't ready.
-				return errors.New("Not ready")
-			}
-
-			return nil
-		}),
+		webserver.WithReadiness(readinessFlag),
 	)
 	if err != nil {
 		logAndExit(err.Error())
@@ -143,10 +130,7 @@ func ExampleNew() {
 	go func() {
 		time.Sleep(2 * time.Second)
 
-		readinessFlagLocker.Lock()
-		defer readinessFlagLocker.Unlock()
-
-		readinessFlag = true
+		readinessFlag.SetReadiness(true)
 	}()
 
 	// Hold the server online for testing.

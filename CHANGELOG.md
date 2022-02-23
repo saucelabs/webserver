@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 To be defined.
 
+## [0.0.3] - 2022-02-23
+### Changed
+- `ReadinessHandler` now provides a `ReadinessState` determiner.
+- Readiness determination now support multiple `ReadinessState` determiners.
+
 ## [0.0.2] - 2022-02-22
 ### Added
 - Added `GetTelemetry` to the `IServer` interface

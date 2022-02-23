@@ -74,7 +74,7 @@ func ExampleNew() {
 	probeResultsLocker := sync.Mutex{}
 
 	// Part of the readiness simulation.
-	readinessFlag := handler.NewReadiness("tunnel")
+	readinessFlag := handler.NewReadinessDeterminer("tunnel")
 
 	// Golang's example are like tests, it's a bad practice to have a hardcoded
 	// port because of the possibility of collision. Generate a random port.

@@ -11,15 +11,15 @@ import (
 	"sync"
 )
 
-// ReadinessState definition. It determines if `name` is ready.
-type ReadinessState struct {
+// ReadinessDeterminer definition. It determines if `name` is ready.
+type ReadinessDeterminer struct {
 	name  string
 	ready bool
 	m     sync.Mutex
 }
 
 // Set state name.
-func (t *ReadinessState) SetName(name string) {
+func (t *ReadinessDeterminer) SetName(name string) {
 	t.m.Lock()
 	defer t.m.Unlock()
 
@@ -27,7 +27,7 @@ func (t *ReadinessState) SetName(name string) {
 }
 
 // Get state name.
-func (t *ReadinessState) GetName() string {
+func (t *ReadinessDeterminer) GetName() string {
 	t.m.Lock()
 	defer t.m.Unlock()
 
@@ -35,7 +35,7 @@ func (t *ReadinessState) GetName() string {
 }
 
 // Set readiness state.
-func (t *ReadinessState) SetReadiness(v bool) {
+func (t *ReadinessDeterminer) SetReadiness(v bool) {
 	t.m.Lock()
 	defer t.m.Unlock()
 
@@ -43,16 +43,16 @@ func (t *ReadinessState) SetReadiness(v bool) {
 }
 
 // Get readiness state.
-func (t *ReadinessState) GetReadiness() bool {
+func (t *ReadinessDeterminer) GetReadiness() bool {
 	t.m.Lock()
 	defer t.m.Unlock()
 
 	return t.ready
 }
 
-// NewReadiness is the Readiness factory.
-func NewReadiness(name string) *ReadinessState {
-	return &ReadinessState{
+// NewReadinessDeterminer is the Readiness factory.
+func NewReadinessDeterminer(name string) *ReadinessDeterminer {
+	return &ReadinessDeterminer{
 		name:  name,
 		ready: false,
 		m:     sync.Mutex{},
@@ -64,7 +64,7 @@ func NewReadiness(name string) *ReadinessState {
 // ready, otherwise sends `503`, "Service Unavailable", and the error. Multiple
 // `Readiness` can be passed. In this case, only if ALL are ready, the server
 // will be considered ready.
-func Readiness(readinessStates ...*ReadinessState) Handler {
+func Readiness(readinessStates ...*ReadinessDeterminer) Handler {
 	return Handler{
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			readinessStateFinalState := true

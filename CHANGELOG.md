@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 To be defined.
 
+## [0.0.4] - 2022-02-23
+### Changed
+- `ReadinessState` is now called `ReadinessDeterminer`.
+
 ## [0.0.3] - 2022-02-23
 ### Changed
 - `ReadinessHandler` now provides a `ReadinessState` determiner.

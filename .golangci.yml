@@ -53,6 +53,7 @@ issues:
         - nlreturn
         - funlen
         - dupl
+        - gocognit
 
     - path: doc.go
       linters:

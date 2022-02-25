@@ -59,6 +59,9 @@ type IServer interface {
 
 	// Start the server.
 	Start() error
+
+	// Stop the server.
+	Stop(sig syscall.Signal) error
 }
 
 //////
@@ -105,7 +108,7 @@ type Timeout struct {
 // Server definition.
 type Server struct {
 	// Address is a TCP address to listen on, default: ":4446".
-	Address string `json:"address" validate:"tcp_addr"`
+	Address string `json:"address" validate:"required,hostname_port"`
 
 	// EnableMetrics controls whether metrics are enable, or not, default: true.
 	EnableMetrics bool `json:"enable_metrics"`
@@ -163,7 +166,7 @@ func (s *Server) GetTelemetry() telemetry.ITelemetry {
 
 // Start the server.
 func (s *Server) Start() error {
-	// Instantiate the underlying HTTP server.
+	// Instantiates the underlying HTTP server.
 	s.server = http.Server{
 		Addr: s.Address,
 		Handler: http.TimeoutHandler(
@@ -245,6 +248,11 @@ func (s *Server) Start() error {
 		// If reaches here, error can be safely collected.
 		return <-serverErr
 	}
+}
+
+// Stop the server.
+func (s *Server) Stop(sig syscall.Signal) error {
+	return syscall.Kill(syscall.Getpid(), sig)
 }
 
 //////

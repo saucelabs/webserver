@@ -11,6 +11,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -26,8 +27,8 @@ const serverName = "test-server"
 // Client simulation.
 var c = http.Client{Timeout: time.Duration(10) * time.Second}
 
-// Setup a test server.
-func setupTestServer(t *testing.T) (IServer, int) {
+// Generates random ports.
+func generatePort(t *testing.T) int64 {
 	t.Helper()
 
 	// Random port.
@@ -36,7 +37,14 @@ func setupTestServer(t *testing.T) (IServer, int) {
 		t.Fatal(err)
 	}
 
-	port := r.MustGenerate()
+	return r.MustGenerate()
+}
+
+// Setup a test server.
+func setupTestServer(t *testing.T) (IServer, int) {
+	t.Helper()
+
+	port := generatePort(t)
 
 	// A classic ExpVar counter.
 	counterMetric := expvar.NewInt("simple_metric_example_counter")
@@ -250,6 +258,101 @@ func TestNew(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			callAndExpect(t, tt.args.port, tt.args.url, tt.args.sc, tt.args.expectedBodyContains)
+		})
+	}
+}
+
+func TestNew_address(t *testing.T) {
+	type args struct {
+		host string
+	}
+	tests := []struct {
+		name           string
+		args           args
+		needRandomPort bool
+		wantErr        bool
+	}{
+		{
+			name: "Should fail - empty",
+			args: args{
+				host: "",
+			},
+			wantErr: true,
+		},
+		{
+			name: "Should fail - localhost -> missing port",
+			args: args{
+				host: "localhost",
+			},
+			wantErr: true,
+		},
+		{
+			name: "Should work - :NNNN -> localhost:NNNN",
+			args: args{
+				host: "",
+			},
+			needRandomPort: true,
+			wantErr:        false,
+		},
+		{
+			name: "Should work - localhost:NNNN",
+			args: args{
+				host: "localhost",
+			},
+			needRandomPort: true,
+			wantErr:        false,
+		},
+		{
+			name: "Should work - 0.0.0.0:NNNN",
+			args: args{
+				host: "0.0.0.0",
+			},
+			needRandomPort: true,
+			wantErr:        false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Host, and port builder.
+			port := ""
+
+			if tt.needRandomPort {
+				port = fmt.Sprintf("%d", generatePort(t))
+			}
+
+			address := fmt.Sprintf("%s:%s", tt.args.host, port)
+
+			if address == ":" {
+				address = ""
+			}
+
+			if address == "localhost:" {
+				address = "localhost"
+			}
+
+			testServer, err := NewBasic(serverName, address)
+			if err != nil && !tt.wantErr {
+				t.Error(err)
+
+				return
+			}
+
+			if testServer != nil {
+				go func() {
+					defer func() {
+						if err := testServer.Stop(syscall.SIGKILL); err != nil {
+							log.Fatal(err)
+
+							return
+						}
+					}()
+					if err := testServer.Start(); err != nil && !tt.wantErr {
+						log.Fatal(err)
+
+						return
+					}
+				}()
+			}
 		})
 	}
 }

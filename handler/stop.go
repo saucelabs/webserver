@@ -23,14 +23,14 @@ func Stop() Handler {
 
 			fmt.Fprintln(w, http.StatusText(http.StatusOK))
 
+			sig := syscall.SIGTERM
+
 			if queryParams.Get("hard") == "true" {
-				if err := syscall.Kill(syscall.Getpid(), syscall.SIGKILL); err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
-				}
-			} else {
-				if err := syscall.Kill(syscall.Getpid(), syscall.SIGINT); err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
-				}
+				sig = syscall.SIGKILL
+			}
+
+			if err := syscall.Kill(syscall.Getpid(), sig); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
 		}),
 		Method: http.MethodGet,

@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 To be defined.
 
+## [0.0.7] - 2022-02-25
+### Added
+- Added missing `webserver.Stop`.
+
+### Changed
+- `Address` validation: only port is required.
+
 ## [0.0.6] - 2022-02-25
 ### Added
 - Added mime type constants.

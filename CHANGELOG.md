@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 To be defined.
 
+## [0.0.5] - 2022-02-25
+### Added
+- Option to set the base router.
+- New Metric type.
+
+### Changed
+- Setting a feature's option enables the feature.
+- `WithMetrics`, `WithHandlers` and `WithReadiness` now accepts multiple params.
+- `New`'s params for handler, and metrics are validated.
+
 ## [0.0.4] - 2022-02-23
 ### Changed
 - `ReadinessState` is now called `ReadinessDeterminer`.
@@ -20,7 +30,7 @@ To be defined.
 
 ## [0.0.2] - 2022-02-22
 ### Added
-- Added `GetTelemetry` to the `IServer` interface
+- Added `GetTelemetry` to the `IServer` interface.
 - Added more tests.
 
 ### Changed

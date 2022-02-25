@@ -15,7 +15,7 @@ import (
 )
 
 //////
-// Const, and vars.
+// Consts, and vars.
 //////
 
 const globalTracerName = "global"

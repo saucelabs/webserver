@@ -11,7 +11,6 @@ import (
 
 	"github.com/gorilla/mux"
 	handler "github.com/saucelabs/webserver/handler"
-	"github.com/saucelabs/webserver/internal/expvar"
 )
 
 // Adds a `Handler` to a `Router`.
@@ -19,19 +18,6 @@ func addHandler(router *mux.Router, handlers ...handler.Handler) {
 	for _, handler := range handlers {
 		router.HandleFunc(handler.Path, handler.Handler).Methods(handler.Method)
 	}
-}
-
-// Publishes server metrics.
-func publishServerMetrics(s *Server) {
-	expvar.Publish("server", expvar.Func(func() interface{} {
-		return struct {
-			*Server
-			PID int `json:"pid"`
-		}{
-			s,
-			os.Getpid(),
-		}
-	}))
 }
 
 // Verifies is `err` is a timeout.

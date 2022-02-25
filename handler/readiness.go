@@ -62,8 +62,8 @@ func NewReadinessDeterminer(name string) *ReadinessDeterminer {
 // Readiness indicates the server is up, running, and ready to work. It follows
 // the "standard" which is send `200` status code, and "OK" in the body if it's
 // ready, otherwise sends `503`, "Service Unavailable", and the error. Multiple
-// `Readiness` can be passed. In this case, only if ALL are ready, the server
-// will be considered ready.
+// readinesses determiners can be passed. In this case, only if ALL are ready,
+// the server will be considered ready.
 func Readiness(readinessStates ...*ReadinessDeterminer) Handler {
 	return Handler{
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -21,12 +21,13 @@ import (
 	"github.com/saucelabs/webserver/internal/logger"
 	"github.com/saucelabs/webserver/internal/middleware"
 	"github.com/saucelabs/webserver/internal/validation"
+	"github.com/saucelabs/webserver/metric"
 	"github.com/saucelabs/webserver/telemetry"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
 )
 
 //////
-// Const, and vars.
+// Consts, and vars.
 //////
 
 const (
@@ -64,15 +65,15 @@ type IServer interface {
 // Definitions.
 //////
 
-// Logging definition.
+// Logging settings.
 type Logging struct {
-	// ConsoleLevel defines the level for the `Console` output.
+	// ConsoleLevel defines the level for the `Console` output, default: "error".
 	ConsoleLevel string `json:"console_level" validate:"required,gte=3,oneof=none fatal error info warn debug trace"`
 
-	// RequestLevel defines the level for logging requests.
+	// RequestLevel defines the level for logging requests, default: "error".
 	RequestLevel string `json:"request_level" validate:"required,gte=3,oneof=none fatal error info warn debug trace"`
 
-	// Filepath is the file path to optionally write logs.
+	// Filepath is the file path to optionally write logs, default: ""
 	Filepath string `json:"filepath" validate:"omitempty,gte=3"`
 }
 
@@ -106,9 +107,6 @@ type Server struct {
 	// Address is a TCP address to listen on, default: ":4446".
 	Address string `json:"address" validate:"tcp_addr"`
 
-	// Name of the server.
-	Name string `json:"name" validate:"required,gte=3"`
-
 	// EnableMetrics controls whether metrics are enable, or not, default: true.
 	EnableMetrics bool `json:"enable_metrics"`
 
@@ -116,17 +114,23 @@ type Server struct {
 	// default: true.
 	EnableTelemetry bool `json:"enable_telemetry"`
 
+	// Name of the server.
+	Name string `json:"name" validate:"required,gte=3"`
+
 	// Logging fine-control.
 	*Logging `json:"logging" validate:"required"`
 
 	// Timeouts fine-control.
 	*Timeout `json:"timeout" validate:"required"`
 
+	// Handlers added, and configured before the server starts.
+	handlers []handler.Handler `json:"-"`
+
 	// Logger powered by Sypl.
 	logger *sypl.Sypl `json:"-" validate:"required"`
 
-	// Handlers added, and configured before the server starts.
-	preLoadedHandlers []handler.Handler `json:"-"`
+	// Metrics added, and configured before the server starts.
+	metrics []metric.Metric `json:"-"`
 
 	// Router powered by Gorilla Mux.
 	router *mux.Router `json:"-" validate:"required"`
@@ -147,7 +151,7 @@ func (s *Server) GetLogger() sypl.ISypl {
 	return s.logger
 }
 
-// GetRouter returns the server router.
+// GetRouter returns the server base router. Use it do add your own handlers.
 func (s *Server) GetRouter() *mux.Router {
 	return s.router
 }
@@ -260,12 +264,12 @@ func New(
 		Address:         address,
 		EnableMetrics:   true,
 		EnableTelemetry: true,
+		Name:            name,
 		Logging: &Logging{
 			ConsoleLevel: level.Error.String(),
 			RequestLevel: level.Error.String(),
 			Filepath:     "",
 		},
-		Name: name,
 		Timeout: &Timeout{
 			ReadTimeout:             defaultTimeout,
 			RequestTimeout:          defaultRequestTimeout,
@@ -274,8 +278,13 @@ func New(
 			WriteTimeout:            defaultTimeout,
 		},
 
-		preLoadedHandlers: []handler.Handler{handler.OK(), handler.Liveness(), handler.Stop()},
-		router:            mux.NewRouter(),
+		handlers: []handler.Handler{handler.Liveness(), handler.OK(), handler.Stop()},
+		metrics: []metric.Metric{
+			{Name: "cmdline", Var: metric.CommandLine()},
+			{Name: "memstats", Var: metric.MemoryStats()},
+			{Name: "server", Var: metric.Server(address, name, os.Getpid())},
+		},
+		router: mux.NewRouter(),
 	}
 
 	//////
@@ -297,7 +306,7 @@ func New(
 		s.Logging.Filepath,
 	).New(name)
 
-	s.router.Use(middleware.Logger(s.logger))
+	s.GetRouter().Use(middleware.Logger(s.logger))
 
 	//////
 	// Telemetry.
@@ -328,19 +337,16 @@ func New(
 	// Load handlers.
 	//////
 
-	addHandler(s.GetRouter(), s.preLoadedHandlers...)
+	addHandler(s.GetRouter(), s.handlers...)
 
 	//////
 	// Server metrics.
 	//////
 
 	if s.EnableMetrics {
-		// Publish Golang's metrics: cmdline, and memstats.
-		expvar.PublishCmdLine()
-		expvar.PublishMemStats()
-
-		// Publish specific server's information.
-		publishServerMetrics(s)
+		for _, metric := range s.metrics {
+			expvar.Publish(metric.Name, metric.Var)
+		}
 
 		// Gorilla Mux exp var route registration.
 		addHandler(s.GetRouter(), handler.ExpVar())
@@ -360,7 +366,7 @@ func NewBasic(name, address string, opts ...Option) (IServer, error) {
 		WithoutMetrics(),
 		WithoutTelemetry(),
 		WithoutLogging(),
-		WithoutPreLoadedHandlers(),
+		WithoutHandlers(),
 	}, opts...)
 
 	return New(name, address, finalOpts...)

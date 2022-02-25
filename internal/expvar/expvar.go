@@ -354,20 +354,30 @@ func Handler() http.Handler {
 // The following lines are changed comparing to the original package.
 //////
 
-// PublishCmdLine publish command line information.
-func PublishCmdLine() {
-	Publish("cmdline", Func(func() interface{} {
+// CommandLine metric.
+func CommandLine() Func {
+	return func() interface{} {
 		return os.Args
-	}))
+	}
 }
 
-// PublishMemStats publish memory stats.
-func PublishMemStats() {
-	Publish("memstats", Func(func() interface{} {
+// PublishCommandLine publish command line information.
+func PublishCommandLine() {
+	Publish("cmdline", CommandLine())
+}
+
+// MemoryStats metric.
+func MemoryStats() Func {
+	return func() interface{} {
 		stats := new(runtime.MemStats)
 		runtime.ReadMemStats(stats)
 		return *stats
-	}))
+	}
+}
+
+// PublishMemoryStats publish memory stats.
+func PublishMemoryStats() {
+	Publish("memstats", MemoryStats())
 }
 
 // RegisterHandler registers the standard expvar endpoint: `GET /debug/vars`.
@@ -379,6 +389,6 @@ func RegisterHandler() {
 // metrics: cmdline, and memstats.
 func Start() {
 	RegisterHandler()
-	PublishCmdLine()
-	PublishMemStats()
+	PublishCommandLine()
+	PublishMemoryStats()
 }

@@ -20,22 +20,31 @@ package webserver
 import (
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/saucelabs/sypl/level"
 	handler "github.com/saucelabs/webserver/handler"
 	"github.com/saucelabs/webserver/internal/expvar"
+	"github.com/saucelabs/webserver/metric"
 	"github.com/saucelabs/webserver/telemetry"
 )
 
 //////
-// Const, vars, and types.
+// Consts, vars, and types.
 //////
 
 // Option allows to define options for the Server.
 type Option func(s *Server)
 
 //////
-// Timeout.
+// Server.
 //////
+
+// WithRouter sets the base router.
+func WithRouter(router *mux.Router) Option {
+	return func(s *Server) {
+		s.router = router
+	}
+}
 
 // WithTimeout sets the maximum duration for each individual timeouts.
 func WithTimeout(read, request, inflight, tasks, write time.Duration) Option {
@@ -59,6 +68,8 @@ func WithTimeout(read, request, inflight, tasks, write time.Duration) Option {
 // SEE: https://opentelemetry.io/vendors
 func WithTelemetry(t *telemetry.Telemetry) Option {
 	return func(s *Server) {
+		s.EnableTelemetry = true
+
 		s.telemetry = t
 	}
 }
@@ -74,17 +85,24 @@ func WithoutTelemetry() Option {
 // Metrics.
 //////
 
-// WithMetricsRaw allows to publishes metrics based on exp vars. It's useful for
-// cases such as counters. It gives full control over what's being exposed.
-func WithMetricsRaw(name string, metrics expvar.Var) Option {
+// WithMetrics adds metrics to the list of pre-loaded metrics.
+//
+// NOTE: Use `metric.New` to bring your own metric.
+func WithMetrics(metrics ...metric.Metric) Option {
 	return func(s *Server) {
-		expvar.Publish(name, metrics)
+		s.EnableMetrics = true
+
+		for _, metric := range metrics {
+			expvar.Publish(metric.Name, metric.Var)
+		}
 	}
 }
 
-// WithMetrics provides a quick way to publish static metric values.
-func WithMetrics(name string, v interface{}) Option {
+// WithMetricsFunc provides a quick way to add metrics.
+func WithMetricsFunc(name string, v interface{}) Option {
 	return func(s *Server) {
+		s.EnableMetrics = true
+
 		expvar.Publish(name, expvar.Func(func() interface{} {
 			return v
 		}))
@@ -102,10 +120,10 @@ func WithoutMetrics() Option {
 // Logging.
 //////
 
-// WithLoggingOptions sets logging configuration.
+// WithLogging sets logging configuration.
 //
 // NOTE: Set filepath to "" to disabled that.
-func WithLoggingOptions(console, request, filepath string) Option {
+func WithLogging(console, request, filepath string) Option {
 	return func(s *Server) {
 		s.Logging.ConsoleLevel = console
 		s.Logging.RequestLevel = request
@@ -113,7 +131,7 @@ func WithLoggingOptions(console, request, filepath string) Option {
 	}
 }
 
-// WithoutLogging() disables logging.
+// WithoutLogging disables logging.
 func WithoutLogging() Option {
 	return func(s *Server) {
 		s.Logging.ConsoleLevel = level.None.String()
@@ -126,31 +144,32 @@ func WithoutLogging() Option {
 // Handlers.
 //////
 
-// WithReadiness sets server readiness. Returning any non-nil error means server
-// isn't ready.
-func WithReadiness(readinessState *handler.ReadinessDeterminer) Option {
+// WithReadiness adds server readiness. Multiple readinesses determiners can be
+// passed. In this case, only if ALL are ready, the server will be considered
+// ready.
+//
+// NOTE: Use `handler.NewReadinessDeterminer` to bring your own determiner.
+func WithReadiness(readinessState ...*handler.ReadinessDeterminer) Option {
 	return func(s *Server) {
-		s.preLoadedHandlers = append(s.preLoadedHandlers, handler.Readiness(readinessState))
+		s.handlers = append(s.handlers, handler.Readiness(readinessState...))
 	}
 }
 
-// WithPreLoadedHandlers adds handlers to the list of pre-loaded handlers.
+// WithHandlers adds handlers to the list of pre-loaded handlers.
 //
 // NOTE: Use `handler.New` to bring your own handler.
-func WithPreLoadedHandlers(handlers ...handler.Handler) Option {
+func WithHandlers(handlers ...handler.Handler) Option {
 	return func(s *Server) {
 		addHandler(s.GetRouter(), handlers...)
 	}
 }
 
-// WithoutPreLoadedHandlers disable the default pre-loaded handlers:
-// - OK handler (`GET /`)
+// WithoutHandlers disable the default pre-loaded handlers:
 // - Liveness handler (`GET /liveness`)
-// - Readiness handler (`GET /readiness`)
-// - Stop handler (`GET /stop`)
-// - Metrics handler (`GET /debug/vars`).
-func WithoutPreLoadedHandlers() Option {
+// - OK handler (`GET /`)
+// - Stop handler (`GET /stop`).
+func WithoutHandlers() Option {
 	return func(s *Server) {
-		s.preLoadedHandlers = []handler.Handler{}
+		s.handlers = []handler.Handler{}
 	}
 }

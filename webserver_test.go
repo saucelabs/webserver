@@ -14,9 +14,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/saucelabs/randomness"
 	"github.com/saucelabs/webserver/handler"
 	"github.com/saucelabs/webserver/internal/expvar"
+	"github.com/saucelabs/webserver/metric"
 )
 
 const serverName = "test-server"
@@ -40,10 +42,16 @@ func setupTestServer(t *testing.T) (IServer, int) {
 	counterMetric := expvar.NewInt("simple_metric_example_counter")
 	counterMetric.Add(1)
 
+	// Router.
+	myCustomRouter := mux.NewRouter()
+	apiRouter := myCustomRouter.PathPrefix("/api").Subrouter()
+	versionedRouter := apiRouter.PathPrefix("/v1").Subrouter()
+
 	// Test server setting many options...
 	testServer, err := New(serverName, fmt.Sprintf("0.0.0.0:%d", port),
+		WithRouter(versionedRouter),
 		// Add a custom handler to the list of pre-loaded handlers.
-		WithPreLoadedHandlers(
+		WithHandlers(
 			// Simulates a slow operation which should timeout.
 			handler.Handler{
 				Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -72,23 +80,17 @@ func setupTestServer(t *testing.T) (IServer, int) {
 			},
 		),
 		// Setting metrics using both the quick, and "raw" way.
-		WithMetrics("simple_metric_example_string", "any_value"),
-		WithMetrics("simple_metric_example_int", 1),
-		WithMetrics("simple_metric_example_bool", true),
-		WithMetrics("simple_metric_example_slice", []string{"any_value"}),
-		WithMetrics("simple_metric_example_struct", struct {
-			CustomValue string `json:"custom_value"`
-		}{
-			CustomValue: "any_value",
-		},
-		),
-		WithMetricsRaw("raw_metrics_example", expvar.Func(func() interface{} {
-			return struct {
-				CustomValue string `json:"custom_value"`
-			}{
-				CustomValue: "any_value",
-			}
-		})),
+		WithMetrics(metric.Metric{
+			Name: "metric_1",
+			Var: expvar.Func(func() interface{} {
+				return struct {
+					CustomValue string `json:"custom_value"`
+				}{
+					CustomValue: "any_value",
+				}
+			}),
+		}),
+		WithMetricsFunc("metric_2", 1),
 		WithTimeout(3*time.Second, 1*time.Second, 3*time.Second, 10*time.Second, 3*time.Second),
 		WithoutTelemetry(),
 	)
@@ -98,7 +100,7 @@ func setupTestServer(t *testing.T) (IServer, int) {
 
 	// This is how a developer, importing this package would add routers, and
 	// routes.
-	sr := testServer.GetRouter().PathPrefix("/api").Subrouter()
+	sr := testServer.GetRouter().PathPrefix("/router2").Subrouter()
 
 	sr.HandleFunc("/counter", func(rw http.ResponseWriter, r *http.Request) {
 		rw.WriteHeader(http.StatusOK)
@@ -183,7 +185,7 @@ func TestNew(t *testing.T) {
 			name: "Should work - liveness",
 			args: args{
 				port:                 port,
-				url:                  "/liveness",
+				url:                  "/api/v1/liveness",
 				sc:                   http.StatusOK,
 				expectedBodyContains: http.StatusText(http.StatusOK),
 			},
@@ -192,7 +194,7 @@ func TestNew(t *testing.T) {
 			name: "Should work - /",
 			args: args{
 				port:                 port,
-				url:                  "/",
+				url:                  "/api/v1/",
 				sc:                   http.StatusOK,
 				expectedBodyContains: http.StatusText(http.StatusOK),
 			},
@@ -201,16 +203,16 @@ func TestNew(t *testing.T) {
 			name: "Should work - /ok",
 			args: args{
 				port:                 port,
-				url:                  "/ok",
+				url:                  "/api/v1/ok",
 				sc:                   http.StatusOK,
 				expectedBodyContains: http.StatusText(http.StatusOK),
 			},
 		},
 		{
-			name: "Should work - sub-router - /api/counter",
+			name: "Should work - sub-router - /router2/counter",
 			args: args{
 				port:                 port,
-				url:                  "/api/counter",
+				url:                  "/api/v1/router2/counter",
 				sc:                   http.StatusOK,
 				expectedBodyContains: http.StatusText(http.StatusOK),
 			},
@@ -219,7 +221,7 @@ func TestNew(t *testing.T) {
 			name: "Should work - /debug/vars - counter",
 			args: args{
 				port:                 port,
-				url:                  "/debug/vars",
+				url:                  "/api/v1/debug/vars",
 				sc:                   http.StatusOK,
 				expectedBodyContains: `"simple_metric_example_counter": 2`,
 			},
@@ -228,7 +230,7 @@ func TestNew(t *testing.T) {
 			name: "Should work - /slow",
 			args: args{
 				port:                 port,
-				url:                  "/slow",
+				url:                  "/api/v1/slow",
 				sc:                   http.StatusServiceUnavailable,
 				expectedBodyContains: ErrRequesTimeout.Error(),
 				delay:                3 * time.Second,
@@ -238,7 +240,7 @@ func TestNew(t *testing.T) {
 			name: "Should work - /stop",
 			args: args{
 				port:                 port,
-				url:                  "/stop",
+				url:                  "/api/v1/stop",
 				sc:                   http.StatusOK,
 				expectedBodyContains: http.StatusText(http.StatusOK),
 				delay:                3 * time.Second,
@@ -262,10 +264,10 @@ func TestNewBasic(t *testing.T) {
 	port := r.MustGenerate()
 
 	testServer, err := NewBasic(serverName, fmt.Sprintf("0.0.0.0:%d", port),
-		WithPreLoadedHandlers(
+		WithHandlers(
 			handler.Liveness(),
 		),
-		WithLoggingOptions("none", "none", ""),
+		WithLogging("none", "none", ""),
 	)
 	if err != nil {
 		log.Fatalf("Failed to setup %s, %v", serverName, err)

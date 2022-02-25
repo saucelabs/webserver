@@ -18,7 +18,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/saucelabs/randomness"
 	"github.com/saucelabs/webserver/handler"
-	"github.com/saucelabs/webserver/internal/expvar"
 	"github.com/saucelabs/webserver/metric"
 )
 
@@ -46,8 +45,8 @@ func setupTestServer(t *testing.T) (IServer, int) {
 
 	port := generatePort(t)
 
-	// A classic ExpVar counter.
-	counterMetric := expvar.NewInt("simple_metric_example_counter")
+	// A classic metric counter.
+	counterMetric := metric.NewInt("simple_metric_example_counter")
 	counterMetric.Add(1)
 
 	// Router.
@@ -90,7 +89,7 @@ func setupTestServer(t *testing.T) (IServer, int) {
 		// Setting metrics using both the quick, and "raw" way.
 		WithMetrics(metric.Metric{
 			Name: "metric_1",
-			Var: expvar.Func(func() interface{} {
+			Value: metric.Func(func() interface{} {
 				return struct {
 					CustomValue string `json:"custom_value"`
 				}{
@@ -115,7 +114,7 @@ func setupTestServer(t *testing.T) (IServer, int) {
 
 		fmt.Fprintln(rw, http.StatusText(http.StatusOK))
 
-		// Increase ExpVar counter example.
+		// Increase metric counter example.
 		counterMetric.Add(1)
 	})
 

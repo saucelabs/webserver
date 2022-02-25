@@ -7,13 +7,13 @@ package handler
 import (
 	"net/http"
 
-	"github.com/saucelabs/webserver/internal/expvar"
+	"github.com/saucelabs/webserver/metric"
 )
 
-// ExpVar serves metrics.
-func ExpVar() Handler {
+// Metrics serves metrics.
+func Metrics() Handler {
 	return Handler{
-		Handler: expvar.Handler().ServeHTTP,
+		Handler: metric.Handler().ServeHTTP,
 		Method:  http.MethodGet,
 		Path:    "/debug/vars",
 	}

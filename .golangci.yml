@@ -5,7 +5,7 @@
 run:
   timeout: 1m
   skip-files:
-    - internal/*
+    - metric/core.go
 
 linters:
   enable-all: true

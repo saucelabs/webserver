@@ -23,7 +23,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/saucelabs/sypl/level"
 	handler "github.com/saucelabs/webserver/handler"
-	"github.com/saucelabs/webserver/internal/expvar"
 	"github.com/saucelabs/webserver/metric"
 	"github.com/saucelabs/webserver/telemetry"
 )
@@ -92,8 +91,8 @@ func WithMetrics(metrics ...metric.Metric) Option {
 	return func(s *Server) {
 		s.EnableMetrics = true
 
-		for _, metric := range metrics {
-			expvar.Publish(metric.Name, metric.Var)
+		for _, m := range metrics {
+			metric.Publish(m.Name, m.Value)
 		}
 	}
 }
@@ -103,7 +102,7 @@ func WithMetricsFunc(name string, v interface{}) Option {
 	return func(s *Server) {
 		s.EnableMetrics = true
 
-		expvar.Publish(name, expvar.Func(func() interface{} {
+		metric.Publish(name, metric.Func(func() interface{} {
 			return v
 		}))
 	}

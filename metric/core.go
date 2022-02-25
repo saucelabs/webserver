@@ -1,25 +1,7 @@
-// Copyright 2009 The Go Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
+// This is the Golang's expvar package from Go Authors, without init plus more
+// methods, and etc.
 
-// Package expvar provides a standardized interface to public variables, such
-// as operation counters in servers. It exposes these variables via HTTP at
-// /debug/vars in JSON format.
-//
-// Operations to set or modify these public variables are atomic.
-//
-// In addition to adding the HTTP handler, this package registers the
-// following variables:
-//
-//	cmdline   os.Args
-//	memstats  runtime.Memstats
-//
-// The package is sometimes only imported for the side effect of
-// registering its HTTP handler and the above variables. To use it
-// this way, link this package into your program:
-//	import _ "expvar"
-//
-package expvar
+package metric
 
 import (
 	"encoding/json"
@@ -36,6 +18,28 @@ import (
 	"sync/atomic"
 )
 
+//////
+// Helpers.
+//////
+
+func metricsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	fmt.Fprintf(w, "{\n")
+	first := true
+	Do(func(kv KeyValue) {
+		if !first {
+			fmt.Fprintf(w, ",\n")
+		}
+		first = false
+		fmt.Fprintf(w, "%q: %s", kv.Key, kv.Value)
+	})
+	fmt.Fprintf(w, "\n}\n")
+}
+
+//////
+// Base type.
+//////
+
 // Var is an abstract type for all exported variables.
 type Var interface {
 	// String returns a valid JSON value for the variable.
@@ -43,6 +47,10 @@ type Var interface {
 	// (such as time.Time) must not be used as a Var.
 	String() string
 }
+
+//////
+// Int type.
+//////
 
 // Int is a 64-bit integer variable that satisfies the Var interface.
 type Int struct {
@@ -64,6 +72,10 @@ func (v *Int) Add(delta int64) {
 func (v *Int) Set(value int64) {
 	atomic.StoreInt64(&v.i, value)
 }
+
+//////
+// Float type.
+//////
 
 // Float is a 64-bit float variable that satisfies the Var interface.
 type Float struct {
@@ -96,6 +108,10 @@ func (v *Float) Add(delta float64) {
 func (v *Float) Set(value float64) {
 	atomic.StoreUint64(&v.f, math.Float64bits(value))
 }
+
+//////
+// Map type.
+//////
 
 // Map is a string-to-Var map variable that satisfies the Var interface.
 type Map struct {
@@ -228,6 +244,10 @@ func (v *Map) Do(f func(KeyValue)) {
 	}
 }
 
+//////
+// String type.
+//////
+
 // String is a string variable, and satisfies the Var interface.
 type String struct {
 	s atomic.Value // string
@@ -250,6 +270,10 @@ func (v *String) Set(value string) {
 	v.s.Store(value)
 }
 
+//////
+// Func type.
+//////
+
 // Func implements Var by calling the function
 // and formatting the returned value using JSON.
 type Func func() interface{}
@@ -269,6 +293,10 @@ var (
 	varKeysMu sync.RWMutex
 	varKeys   []string // sorted
 )
+
+//////
+// Static methods.
+//////
 
 // Publish declares a named exported variable. This should be called from a
 // package's init function when it creates its Vars. If the name is already
@@ -291,7 +319,30 @@ func Get(name string) Var {
 	return v
 }
 
+// Do calls f for each exported variable.
+// The global variable map is locked during the iteration,
+// but existing entries may be concurrently updated.
+func Do(f func(KeyValue)) {
+	varKeysMu.RLock()
+	defer varKeysMu.RUnlock()
+	for _, k := range varKeys {
+		val, _ := vars.Load(k)
+		f(KeyValue{k, val.(Var)})
+	}
+}
+
+// Handler returns the metrics HTTP Handler.
+//
+// This is only needed to install the handler in a non-standard location.
+func Handler() http.Handler {
+	return http.HandlerFunc(metricsHandler)
+}
+
+//////
+// Factory.
+//
 // Convenience functions for creating new exported variables.
+//////
 
 func NewInt(name string) *Int {
 	v := new(Int)
@@ -315,39 +366,6 @@ func NewString(name string) *String {
 	v := new(String)
 	Publish(name, v)
 	return v
-}
-
-// Do calls f for each exported variable.
-// The global variable map is locked during the iteration,
-// but existing entries may be concurrently updated.
-func Do(f func(KeyValue)) {
-	varKeysMu.RLock()
-	defer varKeysMu.RUnlock()
-	for _, k := range varKeys {
-		val, _ := vars.Load(k)
-		f(KeyValue{k, val.(Var)})
-	}
-}
-
-func expvarHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	fmt.Fprintf(w, "{\n")
-	first := true
-	Do(func(kv KeyValue) {
-		if !first {
-			fmt.Fprintf(w, ",\n")
-		}
-		first = false
-		fmt.Fprintf(w, "%q: %s", kv.Key, kv.Value)
-	})
-	fmt.Fprintf(w, "\n}\n")
-}
-
-// Handler returns the expvar HTTP Handler.
-//
-// This is only needed to install the handler in a non-standard location.
-func Handler() http.Handler {
-	return http.HandlerFunc(expvarHandler)
 }
 
 //////
@@ -380,9 +398,9 @@ func PublishMemoryStats() {
 	Publish("memstats", MemoryStats())
 }
 
-// RegisterHandler registers the standard expvar endpoint: `GET /debug/vars`.
+// RegisterHandler registers the standard metrics endpoint: `GET /debug/vars`.
 func RegisterHandler() {
-	http.HandleFunc("/debug/vars", expvarHandler)
+	http.HandleFunc("/debug/vars", metricsHandler)
 }
 
 // Start registers the `GET /debug/vars` endpoint, and publish Golang's built-in

@@ -17,7 +17,6 @@ import (
 	"github.com/saucelabs/sypl"
 	"github.com/saucelabs/sypl/level"
 	handler "github.com/saucelabs/webserver/handler"
-	"github.com/saucelabs/webserver/internal/expvar"
 	"github.com/saucelabs/webserver/internal/logger"
 	"github.com/saucelabs/webserver/internal/middleware"
 	"github.com/saucelabs/webserver/internal/validation"
@@ -288,9 +287,9 @@ func New(
 
 		handlers: []handler.Handler{handler.Liveness(), handler.OK(), handler.Stop()},
 		metrics: []metric.Metric{
-			{Name: "cmdline", Var: metric.CommandLine()},
-			{Name: "memstats", Var: metric.MemoryStats()},
-			{Name: "server", Var: metric.Server(address, name, os.Getpid())},
+			{Name: "cmdline", Value: metric.CommandLine()},
+			{Name: "memstats", Value: metric.MemoryStats()},
+			{Name: "server", Value: metric.Server(address, name, os.Getpid())},
 		},
 		router: mux.NewRouter(),
 	}
@@ -352,12 +351,16 @@ func New(
 	//////
 
 	if s.EnableMetrics {
-		for _, metric := range s.metrics {
-			expvar.Publish(metric.Name, metric.Var)
+		for _, m := range s.metrics {
+			m := m
+
+			metric.Publish(m.Name, metric.Func(func() interface{} {
+				return m.Value
+			}))
 		}
 
 		// Gorilla Mux exp var route registration.
-		addHandler(s.GetRouter(), handler.ExpVar())
+		addHandler(s.GetRouter(), handler.Metrics())
 	}
 
 	return s, nil

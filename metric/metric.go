@@ -1,20 +1,7 @@
 package metric
 
 import (
-	"github.com/saucelabs/webserver/internal/expvar"
 	"github.com/saucelabs/webserver/internal/validation"
-)
-
-//////
-// Consts, and vars.
-//////
-
-var (
-	// CommandLine metric.
-	CommandLine = expvar.CommandLine
-
-	// MemoryStats metric.
-	MemoryStats = expvar.MemoryStats
 )
 
 //////
@@ -27,7 +14,7 @@ type Metric struct {
 	Name string `json:"name" validate:"required"`
 
 	// Var is a valid ExpVar.
-	Var expvar.Var `json:"var" validate:"required"`
+	Value Var `json:"value" validate:"required"`
 }
 
 //////
@@ -35,7 +22,7 @@ type Metric struct {
 //////
 
 // Server information.
-func Server(address, name string, pid int) expvar.Func {
+func Server(address, name string, pid int) Func {
 	return func() interface{} {
 		return struct {
 			// Server address.
@@ -57,10 +44,10 @@ func Server(address, name string, pid int) expvar.Func {
 //////
 
 // New is the Metric factory.
-func New(name string, v expvar.Var) (*Metric, error) {
+func New(name string, value Var) (*Metric, error) {
 	m := &Metric{
-		Name: name,
-		Var:  v,
+		Name:  name,
+		Value: value,
 	}
 
 	if err := validation.ValidateStruct(m); err != nil {

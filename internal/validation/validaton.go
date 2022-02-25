@@ -9,11 +9,9 @@ import (
 	"github.com/saucelabs/customerror"
 )
 
-var (
-	// Re-usable, cached validator.
-	// SEE: https://github.com/go-playground/validator/blob/master/_examples/simple/main.go#L27
-	validatorSingleton *validator.Validate
-)
+// Re-usable, cached validator.
+// SEE: https://github.com/go-playground/validator/blob/master/_examples/simple/main.go#L27
+var validatorSingleton *validator.Validate
 
 // Setup validator.
 func setup() *validator.Validate {

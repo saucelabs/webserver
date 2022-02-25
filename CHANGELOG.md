@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 To be defined.
 
+## [0.0.8] - 2022-02-25
+### Changed
+- Removes any external dependency on `expvar`.
+
 ## [0.0.7] - 2022-02-25
 ### Added
 - Added missing `webserver.Stop`.

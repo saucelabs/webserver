@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 To be defined.
 
+## [0.0.6] - 2022-02-25
+### Added
+- Added mime type constants.
+  
 ## [0.0.5] - 2022-02-25
 ### Added
 - Option to set the base router.

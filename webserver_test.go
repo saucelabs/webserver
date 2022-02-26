@@ -59,6 +59,9 @@ func setupTestServer(t *testing.T) (IServer, int) {
 		WithRouter(versionedRouter),
 		// Add a custom handler to the list of pre-loaded handlers.
 		WithHandlers(
+			handler.Liveness(),
+			handler.OK(),
+			handler.Stop(),
 			// Simulates a slow operation which should timeout.
 			handler.Handler{
 				Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -97,9 +100,7 @@ func setupTestServer(t *testing.T) (IServer, int) {
 				}
 			}),
 		}),
-		WithMetricsFunc("metric_2", 1),
 		WithTimeout(3*time.Second, 1*time.Second, 3*time.Second, 10*time.Second, 3*time.Second),
-		WithoutTelemetry(),
 	)
 	if err != nil {
 		log.Fatalf("Failed to setup %s, %v", serverName, err)
@@ -329,7 +330,7 @@ func TestNew_address(t *testing.T) {
 				address = "localhost"
 			}
 
-			testServer, err := NewBasic(serverName, address)
+			testServer, err := New(serverName, address)
 			if err != nil && !tt.wantErr {
 				t.Error(err)
 
@@ -365,7 +366,7 @@ func TestNewBasic(t *testing.T) {
 
 	port := r.MustGenerate()
 
-	testServer, err := NewBasic(serverName, fmt.Sprintf("0.0.0.0:%d", port),
+	testServer, err := New(serverName, fmt.Sprintf("0.0.0.0:%d", port),
 		WithHandlers(
 			handler.Liveness(),
 		),

@@ -25,18 +25,18 @@ const globalTracerName = "global"
 //////
 
 // Initializes the built-in tracer.
-func initializeBuiltInTracer() (*sdktrace.TracerProvider, error) {
+func initializeStdoutProvider() (*sdktrace.TracerProvider, error) {
 	exporter, err := stdout.New(stdout.WithPrettyPrint())
 	if err != nil {
 		return nil, err
 	}
 
-	builtInTracerProvider := sdktrace.NewTracerProvider(
+	stdoutProvider := sdktrace.NewTracerProvider(
 		sdktrace.WithSampler(sdktrace.AlwaysSample()),
 		sdktrace.WithBatcher(exporter),
 	)
 
-	return builtInTracerProvider, nil
+	return stdoutProvider, nil
 }
 
 //////
@@ -129,17 +129,17 @@ func New(
 	return telemetry, nil
 }
 
-// NewDefault returns a telemetry with the default tracer, the built-in from the
-// SDK which exports to `stdout`, and samples every trace.
-func NewDefault(name string) (*Telemetry, error) {
-	builtInTracerProvider, err := initializeBuiltInTracer()
+// StdoutProvider returns a telemetry which exports to `stdout`, and samples
+// every trace.
+func StdoutProvider(name string) (*Telemetry, error) {
+	stdoutProvider, err := initializeStdoutProvider()
 	if err != nil {
 		return nil, err
 	}
 
 	return New(
 		name,
-		builtInTracerProvider,
+		stdoutProvider,
 		propagation.TraceContext{}, propagation.Baggage{},
 	)
 }

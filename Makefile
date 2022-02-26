@@ -18,10 +18,10 @@ endif
 	@golangci-lint run -v -c .golangci.yml && echo "Lint OK"
 
 test:
-	@go test -timeout 30s -short -v -race -cover -coverprofile=coverage.out ./...
+	@MallocNanoZone=0 go test -timeout 30s -short -v -race -cover -coverprofile=coverage.out ./...
 
 coverage:
-	@go tool cover -func=coverage.out
+	@MallocNanoZone=0 go tool cover -func=coverage.out
 
 doc:
 ifndef HAS_GODOC

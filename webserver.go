@@ -69,10 +69,10 @@ type IServer interface {
 
 // Logging settings.
 type Logging struct {
-	// ConsoleLevel defines the level for the `Console` output, default: "error".
+	// ConsoleLevel defines the level for the `Console` output, default: "none".
 	ConsoleLevel string `json:"console_level" validate:"required,gte=3,oneof=none fatal error info warn debug trace"`
 
-	// RequestLevel defines the level for logging requests, default: "error".
+	// RequestLevel defines the level for logging requests, default: "none".
 	RequestLevel string `json:"request_level" validate:"required,gte=3,oneof=none fatal error info warn debug trace"`
 
 	// Filepath is the file path to optionally write logs, default: ""
@@ -106,14 +106,14 @@ type Timeout struct {
 
 // Server definition.
 type Server struct {
-	// Address is a TCP address to listen on, default: ":4446".
+	// Address is a TCP address to listen on.
 	Address string `json:"address" validate:"required,hostname_port"`
 
-	// EnableMetrics controls whether metrics are enable, or not, default: true.
+	// EnableMetrics controls whether metrics are enable, or not, default: false.
 	EnableMetrics bool `json:"enable_metrics"`
 
 	// EnableTelemetry controls whether telemetry are enable, or not,
-	// default: true.
+	// default: false.
 	EnableTelemetry bool `json:"enable_telemetry"`
 
 	// Name of the server.
@@ -125,14 +125,18 @@ type Server struct {
 	// Timeouts fine-control.
 	*Timeout `json:"timeout" validate:"required"`
 
-	// Handlers added, and configured before the server starts.
+	// Handlers added, and configured before the server starts, default: none.
 	handlers []handler.Handler `json:"-"`
 
 	// Logger powered by Sypl.
 	logger *sypl.Sypl `json:"-" validate:"required"`
 
-	// Metrics added, and configured before the server starts.
+	// Metrics added, and configured before the server starts, default: none.
 	metrics []metric.Metric `json:"-"`
+
+	// Readiness determiners added, and configured before the server starts,
+	// default: none.
+	readinessDeterminers []*handler.ReadinessDeterminer `json:"-"`
 
 	// Router powered by Gorilla Mux.
 	router *mux.Router `json:"-" validate:"required"`
@@ -140,7 +144,7 @@ type Server struct {
 	// HTTP server powered by Golang's built-in http server.
 	server http.Server `json:"-" validate:"required"`
 
-	// Telemetry powered by OpenTelemetry.
+	// Telemetry powered by OpenTelemetry, default: none.
 	telemetry telemetry.ITelemetry `json:"-"`
 }
 
@@ -258,23 +262,20 @@ func (s *Server) Stop(sig syscall.Signal) error {
 // Factory.
 //////
 
-// New is the web server factory. It returns a web server with observability:
-// - Metrics: `cmdline`, `memstats`, and `server`.
-// - Telemetry: `stdout` exporter.
-// - Logging: `error`, no file.
-// - Pre-loaded handlers (Liveness, OK, and Stop).
-func New(
-	name, address string,
-	opts ...Option,
-) (IServer, error) {
+// New returns a basic web server without:
+// - logging
+// - telemetry
+// - metrics
+// - pre-loaded handlers (Liveness, OK, and Stop).
+func New(name, address string, opts ...Option) (IServer, error) {
 	s := &Server{
 		Address:         address,
-		EnableMetrics:   true,
-		EnableTelemetry: true,
+		EnableMetrics:   false,
+		EnableTelemetry: false,
 		Name:            name,
 		Logging: &Logging{
-			ConsoleLevel: level.Error.String(),
-			RequestLevel: level.Error.String(),
+			ConsoleLevel: level.None.String(),
+			RequestLevel: level.None.String(),
 			Filepath:     "",
 		},
 		Timeout: &Timeout{
@@ -285,13 +286,9 @@ func New(
 			WriteTimeout:            defaultTimeout,
 		},
 
-		handlers: []handler.Handler{handler.Liveness(), handler.OK(), handler.Stop()},
-		metrics: []metric.Metric{
-			{Name: "cmdline", Value: metric.CommandLine()},
-			{Name: "memstats", Value: metric.MemoryStats()},
-			{Name: "server", Value: metric.Server(address, name, os.Getpid())},
-		},
-		router: mux.NewRouter(),
+		handlers: []handler.Handler{},
+		metrics:  []metric.Metric{},
+		router:   mux.NewRouter(),
 	}
 
 	//////
@@ -321,7 +318,7 @@ func New(
 
 	if s.EnableTelemetry {
 		if s.GetTelemetry() == nil {
-			defaultTelemetry, err := telemetry.NewDefault(name)
+			defaultTelemetry, err := telemetry.StdoutProvider(name)
 			if err != nil {
 				return nil, err
 			}
@@ -341,10 +338,14 @@ func New(
 	}
 
 	//////
-	// Load handlers.
+	// Handlers.
 	//////
 
 	addHandler(s.GetRouter(), s.handlers...)
+
+	if s.readinessDeterminers != nil && len(s.readinessDeterminers) > 0 {
+		addHandler(s.GetRouter(), handler.Readiness(s.readinessDeterminers...))
+	}
 
 	//////
 	// Server metrics.
@@ -354,9 +355,7 @@ func New(
 		for _, m := range s.metrics {
 			m := m
 
-			metric.Publish(m.Name, metric.Func(func() interface{} {
-				return m.Value
-			}))
+			metric.Publish(m.Name, m.Value)
 		}
 
 		// Gorilla Mux exp var route registration.
@@ -366,19 +365,33 @@ func New(
 	return s, nil
 }
 
-// NewBasic returns a basic web server without observability:
-// - Metrics
-// - Telemetry
-// - Logging
-// - Pre-loaded handlers (Liveness, Readiness, OK, and Stop).
-func NewBasic(name, address string, opts ...Option) (IServer, error) {
-	// Merge default options with new ones (`opts`).
-	finalOpts := append([]Option{
-		WithoutMetrics(),
-		WithoutTelemetry(),
-		WithoutLogging(),
-		WithoutHandlers(),
-	}, opts...)
+// NewDefault returns a web server with observability:
+// - Metrics: `cmdline`, `memstats`, and `server`
+// - Telemetry: `stdout` provider
+// - Logging: `error`, no file
+// - Pre-loaded handlers (Liveness, OK, and Stop)
+// - Versioned router: `/api/v1`.
+func NewDefault(name, address string) (IServer, error) {
+	defaulTelemetry, err := telemetry.StdoutProvider(name)
+	if err != nil {
+		return nil, err
+	}
 
-	return New(name, address, finalOpts...)
+	defaultRouter := mux.NewRouter()
+	apiRouter := defaultRouter.PathPrefix("/api").Subrouter()
+	versionedRouter := apiRouter.PathPrefix("/v1").Subrouter()
+
+	return New(
+		name,
+		address,
+		WithHandlers(handler.Liveness(), handler.OK(), handler.Stop()),
+		WithMetrics(
+			metric.Metric{Name: "cmdline", Value: metric.CommandLine()},
+			metric.Metric{Name: "memstats", Value: metric.MemoryStats()},
+			metric.Metric{Name: "server", Value: metric.Server(address, name, os.Getpid())},
+		),
+		WithLogging(level.Error.String(), level.Error.String(), ""),
+		WithRouter(versionedRouter),
+		WithTelemetry(defaulTelemetry),
+	)
 }

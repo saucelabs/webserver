@@ -22,6 +22,7 @@ import (
 const serverName = "test-server"
 
 // Logs, and exit.
+//nolint:forbidigo
 func logAndExit(msg string) {
 	fmt.Println(msg)
 
@@ -29,7 +30,7 @@ func logAndExit(msg string) {
 }
 
 // Call.
-//nolint:noctx
+//nolint:noctx,unparam
 func callAndExpect(port int, url string, sc int, expectedBodyContains string) (int, string) {
 	c := http.Client{Timeout: time.Duration(10) * time.Second}
 
@@ -87,9 +88,6 @@ func ExampleNew() {
 
 	// Setup server settings some options.
 	testServer, err := webserver.New(serverName, fmt.Sprintf("0.0.0.0:%d", port),
-		webserver.WithoutMetrics(),
-		webserver.WithoutTelemetry(),
-
 		// Sets server readiness.
 		webserver.WithReadiness(readinessFlag),
 	)
@@ -143,4 +141,42 @@ func ExampleNew() {
 
 	// output:
 	// true
+}
+
+func ExampleNewDefault() {
+	// Golang's example are like tests, it's a bad practice to have a hardcoded
+	// port because of the possibility of collision. Generate a random port.
+	r, err := randomness.New(3000, 7000, 10, true)
+	if err != nil {
+		logAndExit(err.Error())
+	}
+
+	port := r.MustGenerate()
+
+	// Setup server settings some options.
+	testServer, err := webserver.NewDefault(serverName, fmt.Sprintf("0.0.0.0:%d", port))
+	if err != nil {
+		logAndExit(err.Error())
+	}
+
+	// Start server, non-blocking way.
+	go func() {
+		if err := testServer.Start(); err != nil {
+			if errors.Is(err, http.ErrServerClosed) {
+				fmt.Println("server stopped")
+			} else {
+				logAndExit(err.Error())
+			}
+		}
+	}()
+
+	// Ensures enough time for the server to be up, and ready - just for testing.
+	time.Sleep(3 * time.Second)
+
+	_, body := callAndExpect(int(port), "/api/v1/", 200, "OK")
+
+	fmt.Println(body)
+
+	// output:
+	// OK
 }

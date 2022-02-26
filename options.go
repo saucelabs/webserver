@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/saucelabs/sypl/level"
 	handler "github.com/saucelabs/webserver/handler"
 	"github.com/saucelabs/webserver/metric"
 	"github.com/saucelabs/webserver/telemetry"
@@ -73,45 +72,18 @@ func WithTelemetry(t *telemetry.Telemetry) Option {
 	}
 }
 
-// WithoutTelemetry disables telemetry.
-func WithoutTelemetry() Option {
-	return func(s *Server) {
-		s.EnableTelemetry = false
-	}
-}
-
 //////
 // Metrics.
 //////
 
-// WithMetrics adds metrics to the list of pre-loaded metrics.
+// WithMetrics sets the list of pre-loaded metrics.
 //
 // NOTE: Use `metric.New` to bring your own metric.
 func WithMetrics(metrics ...metric.Metric) Option {
 	return func(s *Server) {
 		s.EnableMetrics = true
 
-		for _, m := range metrics {
-			metric.Publish(m.Name, m.Value)
-		}
-	}
-}
-
-// WithMetricsFunc provides a quick way to add metrics.
-func WithMetricsFunc(name string, v interface{}) Option {
-	return func(s *Server) {
-		s.EnableMetrics = true
-
-		metric.Publish(name, metric.Func(func() interface{} {
-			return v
-		}))
-	}
-}
-
-// WithoutMetrics disables metrics.
-func WithoutMetrics() Option {
-	return func(s *Server) {
-		s.EnableMetrics = false
+		s.metrics = metrics
 	}
 }
 
@@ -130,45 +102,26 @@ func WithLogging(console, request, filepath string) Option {
 	}
 }
 
-// WithoutLogging disables logging.
-func WithoutLogging() Option {
-	return func(s *Server) {
-		s.Logging.ConsoleLevel = level.None.String()
-		s.Logging.RequestLevel = level.None.String()
-		s.Logging.Filepath = ""
-	}
-}
-
 //////
 // Handlers.
 //////
 
-// WithReadiness adds server readiness. Multiple readinesses determiners can be
+// WithReadiness sets server readiness. Multiple readinesses determiners can be
 // passed. In this case, only if ALL are ready, the server will be considered
 // ready.
 //
 // NOTE: Use `handler.NewReadinessDeterminer` to bring your own determiner.
-func WithReadiness(readinessState ...*handler.ReadinessDeterminer) Option {
+func WithReadiness(readinessDeterminers ...*handler.ReadinessDeterminer) Option {
 	return func(s *Server) {
-		s.handlers = append(s.handlers, handler.Readiness(readinessState...))
+		s.readinessDeterminers = readinessDeterminers
 	}
 }
 
-// WithHandlers adds handlers to the list of pre-loaded handlers.
+// WithHandlers sets the list of pre-loaded handlers.
 //
 // NOTE: Use `handler.New` to bring your own handler.
 func WithHandlers(handlers ...handler.Handler) Option {
 	return func(s *Server) {
-		addHandler(s.GetRouter(), handlers...)
-	}
-}
-
-// WithoutHandlers disable the default pre-loaded handlers:
-// - Liveness handler (`GET /liveness`)
-// - OK handler (`GET /`)
-// - Stop handler (`GET /stop`).
-func WithoutHandlers() Option {
-	return func(s *Server) {
-		s.handlers = []handler.Handler{}
+		s.handlers = handlers
 	}
 }

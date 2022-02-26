@@ -351,6 +351,8 @@ github.com/saucelabs/randomness v0.0.5/go.mod h1:jleEVfS8aVUKZ6Js4NTnqqM62SyvAai
 github.com/saucelabs/sypl v1.5.8/go.mod h1:ubSLpo9I9awtabutiS6Npjof7s/km+HJ/9aOOPClMW0=
 github.com/saucelabs/sypl v1.5.10 h1:EptSBygwDminwfyg9SJP81ZwNcazX+1x1P4HWi18nkI=
 github.com/saucelabs/sypl v1.5.10/go.mod h1:ubSLpo9I9awtabutiS6Npjof7s/km+HJ/9aOOPClMW0=
+github.com/saucelabs/sypl v1.5.11 h1:4ONUPcUX+irjDRf0eZdYrQGDEg4ns9doF8UvH9b6CnQ=
+github.com/saucelabs/sypl v1.5.11/go.mod h1:ubSLpo9I9awtabutiS6Npjof7s/km+HJ/9aOOPClMW0=
 github.com/sean-/seed v0.0.0-20170313163322-e2103e2c3529/go.mod h1:DxrIzT+xaE7yg65j358z/aeFdxmN0P9QXhEzd20vsDc=
 github.com/sirupsen/logrus v1.2.0/go.mod h1:LxeOpSwHxABJmUn/MG1IvRgCAasNZTLOkJPxbbu5VWo=
 github.com/sirupsen/logrus v1.4.2/go.mod h1:tLMulIdttU9McNUspp0xgXVQah82FyeX6MwdIuYE2rE=

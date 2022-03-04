@@ -9,11 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 To be defined.
 
+## [0.0.10] - 2022-03-4
+### Changed
+- Update OS signalling.
+
 ## [0.0.9] - 2022-02-25
 ### Changed
 - Standardizes WithXYZOptions to set params instead of adding.
 - `New` is basic server, `NewDefault` is loaded one.
-  
+
 ## [0.0.8] - 2022-02-25
 ### Changed
 - Removes any external dependency on `expvar`.
@@ -28,7 +32,7 @@ To be defined.
 ## [0.0.6] - 2022-02-25
 ### Added
 - Added mime type constants.
-  
+
 ## [0.0.5] - 2022-02-25
 ### Added
 - Option to set the base router.

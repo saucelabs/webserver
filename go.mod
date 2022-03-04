@@ -10,7 +10,6 @@ require (
 	github.com/go-playground/validator/v10 v10.10.0
 	github.com/gorilla/mux v1.8.0
 	github.com/saucelabs/customerror v1.0.3
-	github.com/spf13/cobra v1.3.0
 	go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux v0.29.0
 	go.opentelemetry.io/otel v1.4.1
 	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.4.1
@@ -25,11 +24,9 @@ require (
 	github.com/go-playground/locales v0.14.0 // indirect
 	github.com/go-playground/universal-translator v0.18.0 // indirect
 	github.com/gorilla/handlers v1.5.1
-	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/leodido/go-urn v1.2.1 // indirect
 	github.com/saucelabs/randomness v0.0.5
 	github.com/saucelabs/sypl v1.5.11
-	github.com/spf13/pflag v1.0.5 // indirect
 	golang.org/x/crypto v0.0.0-20220214200702-86341886e292 // indirect
 	golang.org/x/sys v0.0.0-20220209214540-3681064d5158 // indirect
 	golang.org/x/text v0.3.7 // indirect
@@ -44,4 +41,5 @@ require (
 	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/saucelabs/lumberjack/v3 v3.0.2 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 )

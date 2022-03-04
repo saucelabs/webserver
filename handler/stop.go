@@ -7,7 +7,7 @@ package handler
 import (
 	"fmt"
 	"net/http"
-	"syscall"
+	"os"
 )
 
 // Stop allows the server to be remotely, and gracefully stopped. Optionally set
@@ -23,13 +23,20 @@ func Stop() Handler {
 
 			fmt.Fprintln(w, http.StatusText(http.StatusOK))
 
-			sig := syscall.SIGTERM
+			sig := os.Interrupt
 
 			if queryParams.Get("hard") == "true" {
-				sig = syscall.SIGKILL
+				sig = os.Kill
 			}
 
-			if err := syscall.Kill(syscall.Getpid(), sig); err != nil {
+			p, err := os.FindProcess(os.Getpid())
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+
+				return
+			}
+
+			if err := p.Signal(sig); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
 		}),

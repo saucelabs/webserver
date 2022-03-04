@@ -10,8 +10,8 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 
@@ -340,7 +340,7 @@ func TestNew_address(t *testing.T) {
 			if testServer != nil {
 				go func() {
 					defer func() {
-						if err := testServer.Stop(syscall.SIGKILL); err != nil {
+						if err := testServer.Stop(os.Kill); err != nil {
 							log.Fatal(err)
 
 							return

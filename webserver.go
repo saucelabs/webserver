@@ -53,14 +53,13 @@ type IServer interface {
 
 	// GetRouter returns the server router.
 	GetRouter() *mux.Router
-
 	GetTelemetry() telemetry.ITelemetry
 
 	// Start the server.
 	Start() error
 
 	// Stop the server.
-	Stop(sig syscall.Signal) error
+	Stop(sig os.Signal) error
 }
 
 //////
@@ -254,8 +253,13 @@ func (s *Server) Start() error {
 }
 
 // Stop the server.
-func (s *Server) Stop(sig syscall.Signal) error {
-	return syscall.Kill(syscall.Getpid(), sig)
+func (s *Server) Stop(sig os.Signal) error {
+	p, err := os.FindProcess(os.Getpid())
+	if err != nil {
+		return err
+	}
+
+	return p.Signal(sig)
 }
 
 //////

@@ -7,7 +7,7 @@ package webserver_test
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -22,6 +22,7 @@ import (
 const serverName = "test-server"
 
 // Logs, and exit.
+//
 //nolint:forbidigo
 func logAndExit(msg string) {
 	fmt.Println(msg)
@@ -29,8 +30,6 @@ func logAndExit(msg string) {
 	os.Exit(1)
 }
 
-// Call.
-//nolint:noctx,unparam
 func callAndExpect(port int, url string, sc int, expectedBodyContains string) (int, string) {
 	c := http.Client{Timeout: time.Duration(10) * time.Second}
 
@@ -41,7 +40,7 @@ func callAndExpect(port int, url string, sc int, expectedBodyContains string) (i
 
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		logAndExit(err.Error())
 	}
@@ -171,12 +170,14 @@ func ExampleNewDefault() {
 	}()
 
 	// Ensures enough time for the server to be up, and ready - just for testing.
-	time.Sleep(3 * time.Second)
+	time.Sleep(1 * time.Second)
 
-	_, body := callAndExpect(int(port), "/api/v1/", 200, "OK")
+	responseCode, body := callAndExpect(int(port), "/api/v1/", 200, "OK")
 
+	fmt.Println(responseCode)
 	fmt.Println(body)
 
 	// output:
+	// 200
 	// OK
 }

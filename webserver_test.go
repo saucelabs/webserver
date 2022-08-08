@@ -7,7 +7,7 @@ package webserver
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -122,9 +122,7 @@ func setupTestServer(t *testing.T) (IServer, int) {
 	return testServer, int(port)
 }
 
-// DRY on calling an endpoint, and checking expectations.
-//nolint:noctx,unparam
-func callAndExpect(t *testing.T, port int, url string, sc int, expectedBodyContains string) (int, string) {
+func callAndExpect(t *testing.T, port int, url string, sc int, expectedBodyContains string) {
 	t.Helper()
 
 	resp, err := c.Get(fmt.Sprintf("http://0.0.0.0:%d/%s", port, url))
@@ -134,7 +132,7 @@ func callAndExpect(t *testing.T, port int, url string, sc int, expectedBodyConta
 
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,8 +154,6 @@ func callAndExpect(t *testing.T, port int, url string, sc int, expectedBodyConta
 			}
 		}
 	}
-
-	return resp.StatusCode, finalBody
 }
 
 func TestNew(t *testing.T) {

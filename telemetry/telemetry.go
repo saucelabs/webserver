@@ -93,8 +93,14 @@ func (t *Telemetry) NewTracer(name string) trace.Tracer {
 // GetTracer retrieves a tracer. If the retrieved tracer doesn't exist, the
 // global tracer is returned.
 func (t *Telemetry) GetTracer(name string) trace.Tracer {
-	if tracer, ok := t.tracers.Load(name); ok {
-		return tracer.(trace.Tracer)
+	tracerAny, ok := t.tracers.Load(name)
+
+	if !ok {
+		return t.GetGlobalTracer()
+	}
+
+	if tracer, ok := tracerAny.(trace.Tracer); ok {
+		return tracer
 	}
 
 	return t.GetGlobalTracer()
